@@ -18,14 +18,14 @@ package dscinitialization
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	dsci "github.com/opendatahub-io/opendatahub-operator/apis/dscinitialization/v1alpha1"
 	"github.com/opendatahub-io/opendatahub-operator/controllers/status"
 )
@@ -34,13 +34,14 @@ import (
 type DSCInitializationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	ctx    context.Context
 	Log    logr.Logger
 }
 
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations/finalizers,verbs=update
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups="",resources=services;namespaces;serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -52,16 +53,15 @@ type DSCInitializationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	//_ = log.FromContext(ctx)
-	prevLogger := r.Log
-	defer func() { r.Log = prevLogger }()
-	r.Log = r.Log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
-	r.ctx = ctx
-
-	r.Log.Info("Reconciling DSCInitialization.", "DSCInitialization", klog.KRef(req.Namespace, req.Name))
+	r.Log.Info("Reconciling DSCInitialization.", "DSCInitialization", req.Namespace, "Request.Name", req.Name)
 
 	instance := &dsci.DSCInitialization{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	if err != nil && apierrs.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	} else if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Start reconciling
 	if instance.Status.Conditions == nil {
@@ -72,12 +72,18 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		instance.Status.Phase = status.PhaseProgressing
 		err = r.Client.Status().Update(ctx, instance)
 		if err != nil {
-			r.Log.Error(err, "Failed to add conditions to status of DSCInitialization resource.", "DSCInitialization", klog.KRef(instance.Namespace, instance.Name))
+			r.Log.Error(err, "Failed to add conditions to status of DSCInitialization resource.", "DSCInitialization", req.Namespace, "Request.Name", req.Name)
 			return reconcile.Result{}, err
 		}
 	}
 
-	// ADD RECONCILIATION LOGIC HERE
+	// Check for list of namespaces
+	for _, namespace := range instance.Spec.Namespaces {
+		err = r.createOdhNamespace(namespace, ctx)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
 
 	// Finish reconciling
 	reason := status.ReconcileCompleted
