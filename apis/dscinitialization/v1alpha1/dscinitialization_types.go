@@ -32,8 +32,9 @@ const (
 
 // DSCInitializationSpec defines the desired state of DSCInitialization
 type DSCInitializationSpec struct {
-	Namespaces []string   `json:"namespaces"`
-	Monitoring Monitoring `json:"monitoring,omitempty"`
+	Namespaces   []string   `json:"namespaces"`
+	Monitoring   Monitoring `json:"monitoring,omitempty"`
+	ManifestsUri string     `json:"manifestsUri,omitempty"`
 }
 
 type Monitoring struct {

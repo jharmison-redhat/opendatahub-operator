@@ -12,6 +12,16 @@ rules:
   verbs:
   - create
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - namespaces
+  - secrets
+  - serviceaccounts
+  - services
+  verbs:
+  - create
   - get
   - list
   - patch
@@ -31,6 +41,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - addons.managed.openshift.io
+  resources:
+  - addons
+  verbs:
+  - get
+  - list
 - apiGroups:
   - dscinitialization.opendatahub.io
   resources:
@@ -57,3 +74,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch

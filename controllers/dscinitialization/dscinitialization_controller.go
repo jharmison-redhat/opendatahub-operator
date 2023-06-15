@@ -20,6 +20,7 @@ import (
 	"context"
 	"github.com/go-logr/logr"
 
+	addonv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,6 +29,7 @@ import (
 
 	dsci "github.com/opendatahub-io/opendatahub-operator/apis/dscinitialization/v1alpha1"
 	"github.com/opendatahub-io/opendatahub-operator/controllers/status"
+	"github.com/opendatahub-io/opendatahub-operator/pkg/deploy"
 )
 
 // DSCInitializationReconciler reconciles a DSCInitialization object
@@ -41,7 +43,9 @@ type DSCInitializationReconciler struct {
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups="",resources=services;namespaces;serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch
+//+kubebuilder:rbac:groups="",resources=services;namespaces;serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch
+//+kubebuilder:rbac:groups=addons.managed.openshift.io,resources=addons,verbs=get;list
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings;roles;clusterrolebindings;clusterroles,verbs=get;list;watch;create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -85,6 +89,21 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
+	// Extract latest Manifests
+	err = deploy.DownloadManifests(instance.Spec.ManifestsUri)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if r.isManagedService() {
+		// Apply osd specific permissions
+		// TODO: Fix this PATH
+		err = deploy.DeployManifestsFromPath(r.Client, "/opt/manifests/odh-manifests/odh-manifests/odh-manifests/osd-configs", "redhat-ods-applications")
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	// Finish reconciling
 	reason := status.ReconcileCompleted
 	message := status.ReconcileCompletedMessage
@@ -101,4 +120,18 @@ func (r *DSCInitializationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dsci.DSCInitialization{}).
 		Complete(r)
+}
+
+func (r *DSCInitializationReconciler) isManagedService() bool {
+	expectedAddon := &addonv1alpha1.Addon{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Name: "managed-odh"}, expectedAddon)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return false
+		} else {
+			r.Log.Error(err, "error getting Addon instance for managed service")
+			return false
+		}
+	}
+	return true
 }

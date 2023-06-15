@@ -17,6 +17,7 @@ RUN go mod download
 COPY main.go main.go
 COPY apis/ apis/
 COPY controllers/ controllers/
+COPY pkg/ pkg/
 COPY $LOCAL_BUNDLE/ odh-manifests/
 
 # Add in the odh-manifests tarball

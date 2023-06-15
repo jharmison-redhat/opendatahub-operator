@@ -22,10 +22,10 @@ import (
 	"github.com/opendatahub-io/opendatahub-operator/pkg/plugins"
 )
 
-// downloadManifests function performs following tasks:
+// DownloadManifests function performs following tasks:
 // 1. Given remote URI, download manifests, else extract local bundle
 // 2. It saves the manifests in the odh-manifests/component-name/ folder
-func downloadManifests(uri string) error {
+func DownloadManifests(uri string) error {
 	// Get the component repo from the given url
 	// e.g  https://github.com/example/tarball/master\
 	var reader io.Reader
@@ -101,7 +101,7 @@ func downloadManifests(uri string) error {
 	return nil
 }
 
-func deployManifestsFromPath(cli client.Client, manifestPath, namespace string) error {
+func DeployManifestsFromPath(cli client.Client, manifestPath, namespace string) error {
 
 	// Render the Kustomize manifests
 	k := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
