@@ -5,13 +5,14 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	dsci "github.com/opendatahub-io/opendatahub-operator/apis/dscinitialization/v1alpha1"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,60 +44,66 @@ func DownloadManifests(uri string) error {
 			return fmt.Errorf("error downloading manifests: %v HTTP status", resp.StatusCode)
 		}
 		reader = resp.Body
-	} else {
-		file, err := os.Open("/opt/manifests/odh-manifests.tar.gz")
+
+		//else {
+		//	file, err := os.Open("/opt/manifests/odh-manifests.tar.gz")
+		//	if err != nil {
+		//		return err
+		//	}
+		//	defer file.Close()
+		//	reader = file
+		//}
+
+		// Create a new gzip reader
+		gzipReader, err := gzip.NewReader(reader)
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating gzip reader: %v", err)
 		}
-		defer file.Close()
-		reader = file
-	}
+		defer gzipReader.Close()
 
-	// Create a new gzip reader
-	gzipReader, err := gzip.NewReader(reader)
-	if err != nil {
-		return fmt.Errorf("error creating gzip reader: %v", err)
-	}
-	defer gzipReader.Close()
+		// Create a new TAR reader
+		tarReader := tar.NewReader(gzipReader)
 
-	// Create a new TAR reader
-	tarReader := tar.NewReader(gzipReader)
-	// Empty dir
-	header, err := tarReader.Next()
-	if err == io.EOF {
-		return err
-	}
-	// Create manifest directory
-
-	for {
-		header, err = tarReader.Next()
-		if err == io.EOF {
-			break
-		}
+		// Create manifest directory
+		mode := os.ModePerm
+		err = os.MkdirAll("/opt/manifests/odh-manifests", mode)
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating manifests directory : %v", err)
 		}
 
-		// Determine the file or directory path to extract to
-		target := filepath.Join("/opt/manifests/odh-manifests", header.Name)
-
-		if header.Typeflag == tar.TypeDir {
-			// Create directories
-			err = os.MkdirAll(target, os.ModePerm)
+		for {
+			header, err := tarReader.Next()
+			if err == io.EOF {
+				break
+			}
 			if err != nil {
 				return err
 			}
-		} else if header.Typeflag == tar.TypeReg {
-			// Extract regular files
-			outputFile, err := os.Create(target)
-			if err != nil {
-				return err
-			}
-			defer outputFile.Close()
+			manifestsPath := strings.Split(header.Name, "/")
+			fmt.Printf("This is a manifest path")
+			fmt.Print(manifestsPath)
 
-			_, err = io.Copy(outputFile, tarReader)
-			if err != nil {
-				return err
+			// Determine the file or directory path to extract to
+			target := filepath.Join("/opt/manifests/odh-manifests", strings.Join(manifestsPath, "/"))
+
+			if header.Typeflag == tar.TypeDir {
+				// Create directories
+				err = os.MkdirAll(target, os.ModePerm)
+				if err != nil {
+					return err
+				}
+			} else if header.Typeflag == tar.TypeReg {
+				// Extract regular files
+				outputFile, err := os.Create(target)
+				if err != nil {
+					return err
+				}
+				defer outputFile.Close()
+
+				_, err = io.Copy(outputFile, tarReader)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -104,7 +111,7 @@ func DownloadManifests(uri string) error {
 	return nil
 }
 
-func DeployManifestsFromPath(dscInit *dsci.DSCInitialization, cli client.Client, manifestPath, namespace string, s *runtime.Scheme) error {
+func DeployManifestsFromPath(owner metav1.Object, cli client.Client, manifestPath, namespace string, s *runtime.Scheme) error {
 
 	// Render the Kustomize manifests
 	k := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
@@ -139,7 +146,7 @@ func DeployManifestsFromPath(dscInit *dsci.DSCInitialization, cli client.Client,
 	// Create or update resources in the cluster
 	for _, obj := range objs {
 
-		err = createOrUpdate(dscInit, context.TODO(), cli, obj, s)
+		err = createOrUpdate(owner, context.TODO(), cli, obj, s)
 		if err != nil {
 			return err
 		}
@@ -163,13 +170,13 @@ func getResources(resMap resmap.ResMap) ([]*unstructured.Unstructured, error) {
 	return resources, nil
 }
 
-func createOrUpdate(dscInit *dsci.DSCInitialization, ctx context.Context, cli client.Client, obj *unstructured.Unstructured, s *runtime.Scheme) error {
+func createOrUpdate(owner metav1.Object, ctx context.Context, cli client.Client, obj *unstructured.Unstructured, s *runtime.Scheme) error {
 	fmt.Printf("Creating resource %v: %v", obj.GetKind(), obj.GetName())
 	found := obj.DeepCopy()
 	err := cli.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Set the owner reference for garbage collection
-		if err = controllerutil.SetControllerReference(dscInit, obj, s); err != nil {
+		if err = controllerutil.SetControllerReference(owner, obj, s); err != nil {
 			return err
 		}
 		// Create the resource if it doesn't exist

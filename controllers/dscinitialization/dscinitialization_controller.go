@@ -100,10 +100,9 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if r.isManagedService() {
-		// Apply osd specific permissions
-		// TODO: Fix this PATH
+		//Apply osd specific permissions
 		err = deploy.DeployManifestsFromPath(instance, r.Client,
-			"/opt/manifests/odh-manifests/odh-manifests/odh-manifests/osd-configs",
+			"/opt/odh-manifests/osd-configs",
 			"redhat-ods-applications", r.Scheme)
 		if err != nil {
 			return reconcile.Result{}, err
