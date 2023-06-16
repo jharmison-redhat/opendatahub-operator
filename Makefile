@@ -251,3 +251,17 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+TOOLBOX_GOLANG_VERSION := 1.18.9
+TOOLBOX_OPERATOR_SDK_VERSION := 1.24.1
+
+# Generate a Toolbox container for locally testing changes easily
+.PHONY: toolbox
+toolbox: ## Create a toolbox instance with the proper Golang and Operator SDK versions
+	$(IMAGE_BUILDER) build \
+		--build-arg GOLANG_VERSION=$(TOOLBOX_GOLANG_VERSION) \
+		--build-arg OPERATOR_SDK_VERSION=$(TOOLBOX_OPERATOR_SDK_VERSION) \
+		-f toolbox.Dockerfile -t opendatahub-toolbox .
+	$(IMAGE_BUILDER) stop opendatahub-toolbox ||:
+	toolbox rm opendatahub-toolbox ||:
+	toolbox create opendatahub-toolbox --image localhost/opendatahub-toolbox:latest
