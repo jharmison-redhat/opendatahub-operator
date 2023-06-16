@@ -18,6 +18,10 @@ package main
 
 import (
 	"flag"
+	addonv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
+	authv1 "k8s.io/api/rbac/v1"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -48,6 +52,10 @@ func init() {
 
 	utilruntime.Must(dsci.AddToScheme(scheme))
 	utilruntime.Must(datascienceclusterv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(netv1.AddToScheme(scheme))
+	utilruntime.Must(addonv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(authv1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

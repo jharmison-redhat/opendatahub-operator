@@ -13,7 +13,7 @@ spec:
     listKind: DSCInitializationList
     plural: dscinitializations
     singular: dscinitialization
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .metadata.creationTimestamp

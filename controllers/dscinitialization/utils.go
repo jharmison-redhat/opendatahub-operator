@@ -2,6 +2,8 @@ package dscinitialization
 
 import (
 	"context"
+	dsci "github.com/opendatahub-io/opendatahub-operator/apis/dscinitialization/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -15,7 +17,7 @@ import (
 // - Odh specific labels
 // - Pod security labels for baseline permissions
 // - Network Policies that allow traffic between the ODH namespaces
-func (r *DSCInitializationReconciler) createOdhNamespace(name string, ctx context.Context) error {
+func (r *DSCInitializationReconciler) createOdhNamespace(dscInit *dsci.DSCInitialization, name string, ctx context.Context) error {
 	// Expected namespace for the given name
 	desiredNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -33,6 +35,12 @@ func (r *DSCInitializationReconciler) createOdhNamespace(name string, ctx contex
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Log.Info("Creating namespace", "name", name)
+			// Set Controller reference
+			err = ctrl.SetControllerReference(dscInit, desiredNamespace, r.Scheme)
+			if err != nil {
+				r.Log.Error(err, "Unable to add OwnerReference to the Namespace")
+				return err
+			}
 			err = r.Create(ctx, desiredNamespace)
 			if err != nil && !apierrs.IsAlreadyExists(err) {
 				r.Log.Error(err, "Unable to create namespace", "name", name)
@@ -45,14 +53,14 @@ func (r *DSCInitializationReconciler) createOdhNamespace(name string, ctx contex
 	}
 
 	// Create default NetworkPolicy for the namespace
-	err = createDefaultNetworkPolicy(name, ctx, r.Client)
+	err = r.createDefaultNetworkPolicy(dscInit, name, ctx)
 	if err != nil {
 		r.Log.Error(err, "error creating network policy ", "name", name)
 		return err
 	}
 
 	// Create default Rolebinding for the namespace
-	err = createDefaultRoleBinding(name, ctx, r.Client)
+	err = r.createDefaultRoleBinding(dscInit, name, ctx)
 	if err != nil {
 		r.Log.Error(err, "error creating rolebinding", "name", name)
 		return err
@@ -60,7 +68,7 @@ func (r *DSCInitializationReconciler) createOdhNamespace(name string, ctx contex
 	return nil
 }
 
-func createDefaultRoleBinding(name string, ctx context.Context, cli client.Client) error {
+func (r *DSCInitializationReconciler) createDefaultRoleBinding(dscInit *dsci.DSCInitialization, name string, ctx context.Context) error {
 	// Expected namespace for the given name
 	desiredRoleBinding := &authv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{},
@@ -84,10 +92,16 @@ func createDefaultRoleBinding(name string, ctx context.Context, cli client.Clien
 
 	// Create RoleBinding if doesnot exists
 	foundRoleBinding := &authv1.RoleBinding{}
-	err := cli.Get(ctx, client.ObjectKey{Name: name}, foundRoleBinding)
+	err := r.Client.Get(ctx, client.ObjectKey{Name: name}, foundRoleBinding)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			err = cli.Create(ctx, desiredRoleBinding)
+			// Set Controller reference
+			err = ctrl.SetControllerReference(dscInit, desiredRoleBinding, r.Scheme)
+			if err != nil {
+				r.Log.Error(err, "Unable to add OwnerReference to the rolebinding")
+				return err
+			}
+			err = r.Client.Create(ctx, desiredRoleBinding)
 			if err != nil && !apierrs.IsAlreadyExists(err) {
 				return err
 			}
@@ -98,7 +112,7 @@ func createDefaultRoleBinding(name string, ctx context.Context, cli client.Clien
 	return nil
 }
 
-func createDefaultNetworkPolicy(name string, ctx context.Context, cli client.Client) error {
+func (r *DSCInitializationReconciler) createDefaultNetworkPolicy(dscInit *dsci.DSCInitialization, name string, ctx context.Context) error {
 	// Expected namespace for the given name
 	desiredNetworkPolicy := &netv1.NetworkPolicy{
 		TypeMeta: metav1.TypeMeta{},
@@ -126,10 +140,16 @@ func createDefaultNetworkPolicy(name string, ctx context.Context, cli client.Cli
 
 	// Create NetworkPolicy if doesnot exists
 	foundNetworkPolicy := &netv1.NetworkPolicy{}
-	err := cli.Get(ctx, client.ObjectKey{Name: name}, foundNetworkPolicy)
+	err := r.Client.Get(ctx, client.ObjectKey{Name: name}, foundNetworkPolicy)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			err = cli.Create(ctx, desiredNetworkPolicy)
+			// Set Controller reference
+			err = ctrl.SetControllerReference(dscInit, desiredNetworkPolicy, r.Scheme)
+			if err != nil {
+				r.Log.Error(err, "Unable to add OwnerReference to the Network policy")
+				return err
+			}
+			err = r.Client.Create(ctx, desiredNetworkPolicy)
 			if err != nil && !apierrs.IsAlreadyExists(err) {
 				return err
 			}

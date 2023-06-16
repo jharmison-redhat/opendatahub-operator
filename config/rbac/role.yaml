@@ -6,82 +6,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - datasciencecluster.opendatahub.io
+  - '*'
   resources:
-  - datascienceclusters
+  - '*'
   verbs:
-  - create
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - namespaces
-  - secrets
-  - serviceaccounts
-  - services
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - datasciencecluster.opendatahub.io
-  resources:
-  - datascienceclusters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - datasciencecluster.opendatahub.io
-  resources:
-  - datascienceclusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - addons.managed.openshift.io
-  resources:
-  - addons
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - dscinitialization.opendatahub.io
-  resources:
-  - dscinitializations
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dscinitialization.opendatahub.io
-  resources:
-  - dscinitializations/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dscinitialization.opendatahub.io
-  resources:
-  - dscinitializations/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - networkpolicies
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
+  - '*'
+

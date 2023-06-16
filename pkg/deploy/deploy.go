@@ -5,10 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	dsci "github.com/opendatahub-io/opendatahub-operator/apis/dscinitialization/v1alpha1"
 	"io"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -101,7 +104,7 @@ func DownloadManifests(uri string) error {
 	return nil
 }
 
-func DeployManifestsFromPath(cli client.Client, manifestPath, namespace string) error {
+func DeployManifestsFromPath(dscInit *dsci.DSCInitialization, cli client.Client, manifestPath, namespace string, s *runtime.Scheme) error {
 
 	// Render the Kustomize manifests
 	k := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
@@ -136,7 +139,7 @@ func DeployManifestsFromPath(cli client.Client, manifestPath, namespace string) 
 	// Create or update resources in the cluster
 	for _, obj := range objs {
 
-		err = createOrUpdate(context.TODO(), cli, obj)
+		err = createOrUpdate(dscInit, context.TODO(), cli, obj, s)
 		if err != nil {
 			return err
 		}
@@ -160,15 +163,15 @@ func getResources(resMap resmap.ResMap) ([]*unstructured.Unstructured, error) {
 	return resources, nil
 }
 
-func createOrUpdate(ctx context.Context, cli client.Client, obj *unstructured.Unstructured) error {
-	fmt.Printf("Creating resource :%v", obj.UnstructuredContent())
+func createOrUpdate(dscInit *dsci.DSCInitialization, ctx context.Context, cli client.Client, obj *unstructured.Unstructured, s *runtime.Scheme) error {
+	fmt.Printf("Creating resource %v: %v", obj.GetKind(), obj.GetName())
 	found := obj.DeepCopy()
 	err := cli.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
-		//// Set the owner reference for garbage collection
-		//if err := controllerutil.SetControllerReference(<dscInitialization>, obj, r.Scheme); err != nil {
-		//	return err
-		//}
+		// Set the owner reference for garbage collection
+		if err = controllerutil.SetControllerReference(dscInit, obj, s); err != nil {
+			return err
+		}
 		// Create the resource if it doesn't exist
 		return cli.Create(ctx, obj)
 	} else if err != nil {

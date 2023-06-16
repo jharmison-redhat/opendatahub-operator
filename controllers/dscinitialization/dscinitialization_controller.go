@@ -21,6 +21,9 @@ import (
 	"github.com/go-logr/logr"
 
 	addonv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
+	authv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,6 +42,7 @@ type DSCInitializationReconciler struct {
 	Log    logr.Logger
 }
 
+//+kubebuilder:rbac:groups=*,resources=*,verbs=*
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dscinitialization.opendatahub.io,resources=dscinitializations/finalizers,verbs=update
@@ -83,7 +87,7 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// Check for list of namespaces
 	for _, namespace := range instance.Spec.Namespaces {
-		err = r.createOdhNamespace(namespace, ctx)
+		err = r.createOdhNamespace(instance, namespace, ctx)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -98,7 +102,9 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if r.isManagedService() {
 		// Apply osd specific permissions
 		// TODO: Fix this PATH
-		err = deploy.DeployManifestsFromPath(r.Client, "/opt/manifests/odh-manifests/odh-manifests/odh-manifests/osd-configs", "redhat-ods-applications")
+		err = deploy.DeployManifestsFromPath(instance, r.Client,
+			"/opt/manifests/odh-manifests/odh-manifests/odh-manifests/osd-configs",
+			"redhat-ods-applications", r.Scheme)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -119,6 +125,14 @@ func (r *DSCInitializationReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *DSCInitializationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dsci.DSCInitialization{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&netv1.NetworkPolicy{}).
+		Owns(&authv1.Role{}).
+		Owns(&authv1.RoleBinding{}).
+		Owns(&authv1.ClusterRole{}).
+		Owns(&authv1.ClusterRoleBinding{}).
+		Owns(&corev1.Namespace{}).
 		Complete(r)
 }
 
