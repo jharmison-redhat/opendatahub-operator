@@ -124,7 +124,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
+docker-build: test odh-manifests/version.py ## Build docker image with the manager.
 	${IMAGE_BUILDER} build -t ${IMG} .
 
 .PHONY: docker-push
@@ -137,7 +137,9 @@ image: docker-build docker-push ## Build and push docker image with the manager.
 MANIFESTS_TARBALL_URL="https://github.com/${MANIFEST_REPO}/odh-manifests/tarball/${MANIFEST_RELEASE}"
 
 .PHONY: get-manifests
-get-manifests: ## Get latest odh-manifests tarball
+get-manifests: odh-manifests/version.py ## Get latest odh-manifests tarball
+
+odh-manifests/version.py: ## Get latest odh-manifests tarball
 	rm -fr odh-manifests && mkdir odh-manifests
 	wget -c $(MANIFESTS_TARBALL_URL) -O - | tar -zxv -C odh-manifests/ --strip-components 1
 
