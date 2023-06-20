@@ -138,7 +138,7 @@ MANIFESTS_TARBALL_URL="https://github.com/${MANIFEST_REPO}/odh-manifests/tarball
 
 .PHONY: get-manifests
 get-manifests: ## Get latest odh-manifests tarball
-	rm -r odh-manifests && mkdir odh-manifests
+	rm -fr odh-manifests && mkdir odh-manifests
 	wget -c $(MANIFESTS_TARBALL_URL) -O - | tar -xv -C odh-manifests/ --strip-components 1
 
 ##@ Deployment
