@@ -12,5 +12,5 @@ RUN curl -Lo /tmp/golang.tgz https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.t
  && echo -e '#!/bin/bash\nflatpak-spawn --host podman "${@}"' > /usr/local/bin/podman \
  && chmod +x /usr/local/bin/operator-sdk /usr/local/bin/podman \
  && echo -e 'GOROOT=/usr/local/go\nGOPATH=$HOME/go\nPATH=$GOPATH/bin:$GOROOT/bin:$PATH\nexport GOROOT GOPATH PATH' > /etc/profile.d/go.sh \
- && dnf -y install gcc make \
+ && dnf -y install gcc make ripgrep \
  && dnf -y clean all
