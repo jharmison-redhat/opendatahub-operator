@@ -28,9 +28,9 @@ import (
 
 // DataScienceClusterSpec defines the desired state of DataScienceCluster
 type DataScienceClusterSpec struct {
-// A profile sets the default components and configuration to install for a given
-// use case. The profile configuration can still be overriden by the user on a per
-// component basis. If not defined, the 'core' profile is used.
+	// A profile sets the default components and configuration to install for a given
+	// use case. The profile configuration can still be overriden by the user on a per
+	// component basis. If not defined, the 'core' profile is used.
 	Profile ProfileValue `json:"profile,omitempty"`
 
 	// Components are used to override and fine tune specific component configurations.
